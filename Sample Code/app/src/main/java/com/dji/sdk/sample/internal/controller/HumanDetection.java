@@ -49,7 +49,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
     private VideoFeeder.VideoDataListener videoDataListener;
     private Net net;  // MobileNet SSD
 
-    // coco-like classes (caffe version)
+    // coco-like classes (caffe version) object detection list
     private static final String[] classNames = {"background",
             "aeroplane", "bicycle", "bird", "boat",
             "bottle", "bus", "car", "cat", "chair",
@@ -71,7 +71,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
             flightController = ac.getFlightController();
         }
 
-        // OpenCV 初始化
+        // OpenCV initiation
         if (!OpenCVLoader.initDebug()) {
             Log.e(TAG, "Unable to load OpenCV!");
             Toast.makeText(this, "OpenCV initialization failed!", Toast.LENGTH_LONG).show();
@@ -80,7 +80,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
             Log.d(TAG, "OpenCV loaded successfully!");
         }
 
-        // 載入 DNN 模型
+        // load DNN model
         MatOfByte modelBuffer = loadFileFromResource(R.raw.mobilenet_iter_73000);
         MatOfByte configBuffer = loadFileFromResource(R.raw.deploy);
         if (modelBuffer == null || configBuffer == null) {
@@ -90,10 +90,11 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
             Log.d(TAG, "Network loaded successfully");
         }
 
-        // TextureView 綁定
+        // TextureView
         textureView = findViewById(R.id.videoTex);
         textureView.setSurfaceTextureListener(this);
     }
+
 
     private MatOfByte loadFileFromResource(int id) {
         try {
@@ -108,60 +109,76 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         }
     }
 
-    //virtual stick control function
-    private void takeoffAndHover() {
+    // drone behavior functions
+    private void armed() {
         if (flightController == null) return;
 
-        flightController.startTakeoff(djiError -> {
-            if (djiError == null) {
-                Log.d(TAG, "Takeoff started");
-                ToastUtils.setResultToToast("Takeoff started");
+        flightController.startTakeoff(takeoffError -> {
+            if (takeoffError == null) {
+                Log.d(TAG, "Armed: takeoff started");
+                ToastUtils.setResultToToast("Armed: takeoff started");
+
                 setupVirtualStick();
+
+                // After 30 seconds, start the landing procedure
+                new android.os.Handler().postDelayed(() -> {
+                    flightController.startLanding(landingError -> {
+                        if (landingError == null) {
+                            Log.d(TAG, "Armed: landing started after 30s");
+                            ToastUtils.setResultToToast("Armed: landing started after 30s");
+
+                            // If the aircraft stays hovering (landing protection active),
+                            // confirm landing after 5 seconds to force touchdown
+                            new android.os.Handler().postDelayed(() -> {
+                                flightController.confirmLanding(confirmError -> {
+                                    if (confirmError == null) {
+                                        Log.d(TAG, "Armed: landing confirmed, forcing touchdown");
+                                        ToastUtils.setResultToToast("Armed: landing confirmed, forcing touchdown");
+                                    } else {
+                                        Log.e(TAG, "Armed: confirm landing failed: " + confirmError.getDescription());
+                                        ToastUtils.setResultToToast("Armed: confirm landing failed");
+                                    }
+                                });
+                            }, 5000);
+
+                        } else {
+                            Log.e(TAG, "Armed: landing failed: " + landingError.getDescription());
+                            ToastUtils.setResultToToast("Armed: landing failed");
+                        }
+                    });
+                }, 30000); // 30 seconds delay before landing
+
             } else {
-                Log.e(TAG, "Takeoff failed: " + djiError.getDescription());
-                ToastUtils.setResultToToast("Takeoff failed");
+                Log.e(TAG, "Armed: takeoff failed: " + takeoffError.getDescription());
+                ToastUtils.setResultToToast("Armed: takeoff failed");
             }
         });
     }
 
-    private void land() {
+    private void terminate() {
         if (flightController == null) return;
 
+        //initiate landing
         flightController.startLanding(djiError -> {
             if (djiError == null) {
-                Log.d(TAG, "Landing started");
-                ToastUtils.setResultToToast("Landing started");
-                // 延遲幾秒後，檢查是否卡在低空 → 強制確認降落
+                Log.d(TAG, "Terminate: landing started");
+                ToastUtils.setResultToToast("Terminate: landing started");
+                // if the drone didn't detect flat surface and didnt land 5s after, confirm and force landing
                 new android.os.Handler().postDelayed(() -> {
                     flightController.confirmLanding(err -> {
                         if (err == null) {
-                            Log.d(TAG, "Landing confirmed, forcing touchdown");
-                            ToastUtils.setResultToToast("Landing confirmed, forcing touchdown");
+                            Log.d(TAG, "Terminate: Landing confirmed, forcing touchdown");
+                            ToastUtils.setResultToToast("Terminate: Landing confirmed, forcing touchdown");
                         } else {
-                            Log.e(TAG, "Confirm landing failed: " + err.getDescription());
-                            ToastUtils.setResultToToast("Confirm landing failed");
+                            Log.e(TAG, "Terminate: Confirm landing failed: " + err.getDescription());
+                            ToastUtils.setResultToToast("Terminate: Confirm landing failed");
                         }
                     });
                 }, 5000);
 
             } else {
-                Log.e(TAG, "Landing failed: " + djiError.getDescription());
-                ToastUtils.setResultToToast("Landing failed");
-            }
-        });
-    }
-
-
-
-    private void setupVirtualStick() {
-        flightController.setRollPitchCoordinateSystem(FlightCoordinateSystem.BODY);
-        flightController.setRollPitchControlMode(RollPitchControlMode.VELOCITY);
-        flightController.setYawControlMode(YawControlMode.ANGULAR_VELOCITY);
-        flightController.setVerticalControlMode(VerticalControlMode.VELOCITY);
-
-        flightController.setVirtualStickModeEnabled(true, djiError -> {
-            if (djiError == null) {
-                Log.d(TAG, "Virtual stick enabled");
+                Log.e(TAG, "Terminate: Landing failed: " + djiError.getDescription());
+                ToastUtils.setResultToToast("Terminate: Landing failed");
             }
         });
     }
@@ -174,19 +191,32 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
                 Log.d(TAG, "Test: Takeoff started");
                 ToastUtils.setResultToToast("Test: Takeoff started");
 
-                // 等 6 秒，確保飛機已經懸停在 1.2m 並進入 flying 狀態
+                // wait for 6s, make sure the drone is flying still in 1.2m height and entered flying mode
                 new android.os.Handler().postDelayed(() -> {
 
-                    // 確保關掉 Virtual Stick
+                    //make sure virtual stick is turned off(so that it doesn't yaw)
                     flightController.setVirtualStickModeEnabled(false, null);
 
-                    // 再呼叫 landing
-                    flightController.startLanding(err -> {
-                        if (err == null) {
-                            Log.d(TAG, "Test: Landing started");
-                            ToastUtils.setResultToToast("Test: Landing started");
+                    //initiate landing
+                    flightController.startLanding(landingError -> {
+                        if (landingError == null) {
+                            Log.d(TAG, "Test: landing started");
+                            ToastUtils.setResultToToast("Test: landing started");
+                            // if the drone didn't detect flat surface and didnt land 5s after, confirm and force landing
+                            new android.os.Handler().postDelayed(() -> {
+                                flightController.confirmLanding(err -> {
+                                    if (err == null) {
+                                        Log.d(TAG, "Test: Landing confirmed, forcing touchdown");
+                                        ToastUtils.setResultToToast("Test: Landing confirmed, forcing touchdown");
+                                    } else {
+                                        Log.e(TAG, "Test: Confirm landing failed: " + err.getDescription());
+                                        ToastUtils.setResultToToast("Test: Confirm landing failed");
+                                    }
+                                });
+                            }, 5000);
+
                         } else {
-                            Log.e(TAG, "Test: Landing failed - " + err.getDescription());
+                            Log.e(TAG, "Test: Landing failed: " + landingError.getDescription());
                             ToastUtils.setResultToToast("Test: Landing failed");
                         }
                     });
@@ -200,7 +230,18 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         });
     }
 
+    private void setupVirtualStick() {
+        flightController.setRollPitchCoordinateSystem(FlightCoordinateSystem.BODY);
+        flightController.setRollPitchControlMode(RollPitchControlMode.VELOCITY);
+        flightController.setYawControlMode(YawControlMode.ANGULAR_VELOCITY);
+        flightController.setVerticalControlMode(VerticalControlMode.VELOCITY);
 
+        flightController.setVirtualStickModeEnabled(true, djiError -> {
+            if (djiError == null) {
+                Log.d(TAG, "Virtual stick enabled");
+            }
+        });
+    }
 
 
 
@@ -278,7 +319,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
     }
 
 
-    // ---- DNN 人偵測 ----
+    // ---- DNN human detection ----
     private boolean detectHuman(Mat frame) {
         if (net == null) {
             Log.e(TAG, "DNN not loaded");
@@ -315,6 +356,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
                 if (classId == 15) { // person
                     found = true;
                     Log.d(TAG, "Human Detected! conf=" + confidence);
+                    ToastUtils.setResultToToast("Human Detected! conf=" + confidence);
 
                     if (followHuman) {
                         int xCenter = (left + right) / 2;
@@ -328,17 +370,15 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         return found;
     }
 
-
     public void onArmedClick(View v) {
-        takeoffAndHover();
+        armed();
         followHuman = true;
     }
 
     public void onLandClick(View v) {
-        land();
+        terminate();
         followHuman = false;
     }
-
 
     public void onTestClick(View v) {
         test();
