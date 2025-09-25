@@ -161,7 +161,6 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
 
         net.setInput(blob);
         Mat detections = net.forward();
-        Log.d(TAG, "Detections shape: " + detections.size());
 
         int cols = frame.cols();
         int rows = frame.rows();
@@ -173,9 +172,8 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
             double confidence = detections.get(i, 2)[0];
             int classId = (int) detections.get(i, 1)[0];
 
-            Log.d(TAG, "Detection[" + i + "]: classId=" + classId + " conf=" + confidence);
 
-            if (confidence > 0.15) {
+            if (confidence > 0.3) {
                 int left   = (int)(detections.get(i, 3)[0] * cols);
                 int top    = (int)(detections.get(i, 4)[0] * rows);
                 int right  = (int)(detections.get(i, 5)[0] * cols);
@@ -183,11 +181,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
 
                 if (classId == 15) { // person
                     found = true;
-                    Imgproc.rectangle(frame, new Point(left, top), new Point(right, bottom),
-                            new Scalar(0, 255, 0), 2);
-
-                    Imgproc.putText(frame, "DANGER", new Point(left, top - 10),
-                            Imgproc.FONT_HERSHEY_SIMPLEX, 2.0, new Scalar(0, 0, 255), 3);
+                    Log.d(TAG, "Human Detected! " +  " conf=" + confidence);
                 }
             }
         }
