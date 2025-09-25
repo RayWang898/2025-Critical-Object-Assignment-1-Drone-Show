@@ -6,6 +6,7 @@ import android.media.MediaFormat;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.TextureView;
+import android.view.View;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -30,14 +31,21 @@ import java.nio.ByteBuffer;
 import dji.sdk.codec.DJICodecManager;
 import dji.sdk.camera.VideoFeeder;
 
+import dji.common.flightcontroller.virtualstick.FlightControlData;
+import dji.common.flightcontroller.virtualstick.FlightCoordinateSystem;
+import dji.common.flightcontroller.virtualstick.RollPitchControlMode;
+import dji.common.flightcontroller.virtualstick.YawControlMode;
+import dji.common.flightcontroller.virtualstick.VerticalControlMode;
+import dji.sdk.flightcontroller.FlightController;
+import dji.sdk.products.Aircraft;
+
+
 public class HumanDetection extends AppCompatActivity implements TextureView.SurfaceTextureListener {
 
     private static final String TAG = "HumanDetection";
-
     private TextureView textureView;
     private DJICodecManager codecManager;
     private VideoFeeder.VideoDataListener videoDataListener;
-
     private Net net;  // MobileNet SSD
 
     // coco-like classes (caffe version)
@@ -47,11 +55,18 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
             "cow", "diningtable", "dog", "horse",
             "motorbike", "person", "pottedplant",
             "sheep", "sofa", "train", "tvmonitor"};
+    private FlightController flightController;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_human_detection);
+
+        // initiate flight controller
+        Aircraft ac = (Aircraft) DJISampleApplication.getProductInstance();
+        if (ac != null) {
+            flightController = ac.getFlightController();
+        }
 
         // OpenCV 初始化
         if (!OpenCVLoader.initDebug()) {
@@ -89,6 +104,78 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
             return null;
         }
     }
+
+    //virtual stick control function
+    private void takeoffAndHover() {
+        if (flightController == null) return;
+
+        flightController.startTakeoff(djiError -> {
+            if (djiError == null) {
+                Log.d(TAG, "Takeoff started");
+                setupVirtualStick();
+            } else {
+                Log.e(TAG, "Takeoff failed: " + djiError.getDescription());
+            }
+        });
+    }
+
+    private void land() {
+        if (flightController == null) return;
+
+        flightController.startLanding(djiError -> {
+            if (djiError == null) {
+                Log.d(TAG, "Landing started");
+            } else {
+                Log.e(TAG, "Landing failed: " + djiError.getDescription());
+            }
+        });
+    }
+
+
+    private void setupVirtualStick() {
+        flightController.setRollPitchCoordinateSystem(FlightCoordinateSystem.BODY);
+        flightController.setRollPitchControlMode(RollPitchControlMode.VELOCITY);
+        flightController.setYawControlMode(YawControlMode.ANGULAR_VELOCITY);
+        flightController.setVerticalControlMode(VerticalControlMode.VELOCITY);
+
+        flightController.setVirtualStickModeEnabled(true, djiError -> {
+            if (djiError == null) {
+                Log.d(TAG, "Virtual stick enabled");
+            }
+        });
+    }
+
+    private void test(View v){
+        if (flightController == null) return;
+
+        // 先起飛
+        flightController.startTakeoff(djiError -> {
+            if (djiError == null) {
+                Log.d(TAG, "Test: Takeoff started");
+
+                // 啟用虛擬搖桿（可選，方便保持高度）
+                setupVirtualStick();
+
+                // 延遲 5 秒再降落
+                new android.os.Handler().postDelayed(() -> {
+                    flightController.startLanding(err -> {
+                        if (err == null) {
+                            Log.d(TAG, "Test: Landing started after 5s");
+                        } else {
+                            Log.e(TAG, "Test: Landing failed - " + err.getDescription());
+                        }
+                    });
+                }, 5000);
+
+            } else {
+                Log.e(TAG, "Test: Takeoff failed - " + djiError.getDescription());
+            }
+        });
+
+    }
+
+
+
 
     // ---- TextureView callback ----
     @Override
@@ -145,6 +232,25 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         return bgrMat;
     }
 
+    //yaw control function
+    private void facePerson(float xNorm) {
+        if (flightController == null) return;
+
+        float error = xNorm - 0.5f;   // 左負右正
+        float K = 60f;                // 比例增益
+        float yawRate = K * error;    // deg/s
+        yawRate = Math.max(-25f, Math.min(25f, yawRate));
+
+        FlightControlData ctrl = new FlightControlData(
+                0f,   // pitch
+                0f,   // roll
+                yawRate, // yaw 角速度
+                0f    // throttle
+        );
+        flightController.sendVirtualStickFlightControlData(ctrl, null);
+    }
+
+
     // ---- DNN 人偵測 ----
     private boolean detectHuman(Mat frame) {
         if (net == null) {
@@ -181,10 +287,30 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
 
                 if (classId == 15) { // person
                     found = true;
-                    Log.d(TAG, "Human Detected! " +  " conf=" + confidence);
+                    Log.d(TAG, "Human Detected! conf=" + confidence);
+
+                    int xCenter = (left + right) / 2;
+                    float xNorm = (float)xCenter / (float)cols; // [0,1]
+                    facePerson(xNorm);
                 }
+
             }
         }
         return found;
     }
+
+
+    public void onArmedClick(View v) {
+        takeoffAndHover();
+    }
+
+    public void onLandClick(View v) {
+        land();
+    }
+
+
+    public void onTestClick(View v) {
+        test();
+    }
+
 }

@@ -8,4 +8,39 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_gravity="bottom|center_horizontal">
+
+        <Button
+            android:id="@+id/btnArmed"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Armed"
+            android:onClick="onArmedClick"/>
+
+        <Button
+            android:id="@+id/btnLand"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Land"
+            android:onClick="onLandClick"
+            android:layout_marginTop="8dp"/>
+
+        <Button
+            android:id="@+id/btnTest"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Test"
+            android:onClick="onTestClick"
+            android:layout_marginTop="8dp"/>
+    </LinearLayout>
+
+
+
+
+
+
 </FrameLayout>
