@@ -8,10 +8,4 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <com.dji.sdk.sample.internal.controller.OverlayView
-        android:id="@+id/overlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@android:color/transparent" />
 </FrameLayout>
-
