@@ -12,6 +12,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.dji.sdk.sample.R;
+import com.dji.sdk.sample.internal.utils.ToastUtils;
 
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
@@ -56,6 +57,8 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
             "motorbike", "person", "pottedplant",
             "sheep", "sofa", "train", "tvmonitor"};
     private FlightController flightController;
+    private boolean followHuman = false;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,9 +115,11 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         flightController.startTakeoff(djiError -> {
             if (djiError == null) {
                 Log.d(TAG, "Takeoff started");
+                ToastUtils.setResultToToast("Takeoff started");
                 setupVirtualStick();
             } else {
                 Log.e(TAG, "Takeoff failed: " + djiError.getDescription());
+                ToastUtils.setResultToToast("Takeoff failed");
             }
         });
     }
@@ -125,11 +130,27 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         flightController.startLanding(djiError -> {
             if (djiError == null) {
                 Log.d(TAG, "Landing started");
+                ToastUtils.setResultToToast("Landing started");
+                // 延遲幾秒後，檢查是否卡在低空 → 強制確認降落
+                new android.os.Handler().postDelayed(() -> {
+                    flightController.confirmLanding(err -> {
+                        if (err == null) {
+                            Log.d(TAG, "Landing confirmed, forcing touchdown");
+                            ToastUtils.setResultToToast("Landing confirmed, forcing touchdown");
+                        } else {
+                            Log.e(TAG, "Confirm landing failed: " + err.getDescription());
+                            ToastUtils.setResultToToast("Confirm landing failed");
+                        }
+                    });
+                }, 5000);
+
             } else {
                 Log.e(TAG, "Landing failed: " + djiError.getDescription());
+                ToastUtils.setResultToToast("Landing failed");
             }
         });
     }
+
 
 
     private void setupVirtualStick() {
@@ -145,34 +166,40 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         });
     }
 
-    private void test(View v){
+    private void test(){
         if (flightController == null) return;
 
-        // 先起飛
         flightController.startTakeoff(djiError -> {
             if (djiError == null) {
                 Log.d(TAG, "Test: Takeoff started");
+                ToastUtils.setResultToToast("Test: Takeoff started");
 
-                // 啟用虛擬搖桿（可選，方便保持高度）
-                setupVirtualStick();
-
-                // 延遲 5 秒再降落
+                // 等 6 秒，確保飛機已經懸停在 1.2m 並進入 flying 狀態
                 new android.os.Handler().postDelayed(() -> {
+
+                    // 確保關掉 Virtual Stick
+                    flightController.setVirtualStickModeEnabled(false, null);
+
+                    // 再呼叫 landing
                     flightController.startLanding(err -> {
                         if (err == null) {
-                            Log.d(TAG, "Test: Landing started after 5s");
+                            Log.d(TAG, "Test: Landing started");
+                            ToastUtils.setResultToToast("Test: Landing started");
                         } else {
                             Log.e(TAG, "Test: Landing failed - " + err.getDescription());
+                            ToastUtils.setResultToToast("Test: Landing failed");
                         }
                     });
-                }, 5000);
+
+                }, 6000);
 
             } else {
                 Log.e(TAG, "Test: Takeoff failed - " + djiError.getDescription());
+                ToastUtils.setResultToToast("Test: Takeoff failed");
             }
         });
-
     }
+
 
 
 
@@ -289,9 +316,11 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
                     found = true;
                     Log.d(TAG, "Human Detected! conf=" + confidence);
 
-                    int xCenter = (left + right) / 2;
-                    float xNorm = (float)xCenter / (float)cols; // [0,1]
-                    facePerson(xNorm);
+                    if (followHuman) {
+                        int xCenter = (left + right) / 2;
+                        float xNorm = (float)xCenter / (float)cols;
+                        facePerson(xNorm);
+                    }
                 }
 
             }
@@ -302,15 +331,18 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
 
     public void onArmedClick(View v) {
         takeoffAndHover();
+        followHuman = true;
     }
 
     public void onLandClick(View v) {
         land();
+        followHuman = false;
     }
 
 
     public void onTestClick(View v) {
         test();
+        followHuman = false;
     }
 
 }
