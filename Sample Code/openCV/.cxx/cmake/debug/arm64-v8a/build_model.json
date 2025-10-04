@@ -1,0 +1,220 @@
+{
+  "abi": "ARM64_V8A",
+  "info": {
+    "abi": "ARM64_V8A",
+    "bitness": 64,
+    "deprecated": false,
+    "default": true
+  },
+  "originalCxxBuildFolder": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/.cxx/cmake/debug/arm64-v8a",
+  "cxxBuildFolder": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/.cxx/cmake/debug/arm64-v8a",
+  "abiPlatformVersion": 21,
+  "cmake": {
+    "cmakeWrappingBaseFolder": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/.cxx/cxx/debug/arm64-v8a",
+    "cmakeArtifactsBaseFolder": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/.cxx/cmake/debug/arm64-v8a",
+    "effectiveConfiguration": {
+      "name": "traditional-android-studio-cmake-environment",
+      "description": "Composite reified CMakeSettings configuration",
+      "generator": "Ninja",
+      "inheritEnvironments": [
+        "ndk"
+      ],
+      "buildRoot": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/.cxx/cmake/debug/arm64-v8a",
+      "cmakeToolchain": "/Users/rayrayrule/Library/Android/sdk/ndk/21.4.7075529/build/cmake/android.toolchain.cmake",
+      "cmakeExecutable": "/Users/rayrayrule/Library/Android/sdk/cmake/3.10.2.4988404/bin/cmake",
+      "variables": [
+        {
+          "name": "CMAKE_FIND_ROOT_PATH",
+          "value": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/.cxx/cmake/debug/prefab/arm64-v8a/prefab"
+        },
+        {
+          "name": "CMAKE_BUILD_TYPE",
+          "value": "Debug"
+        },
+        {
+          "name": "CMAKE_TOOLCHAIN_FILE",
+          "value": "/Users/rayrayrule/Library/Android/sdk/ndk/21.4.7075529/build/cmake/android.toolchain.cmake"
+        },
+        {
+          "name": "ANDROID_ABI",
+          "value": "arm64-v8a"
+        },
+        {
+          "name": "ANDROID_NDK",
+          "value": "/Users/rayrayrule/Library/Android/sdk/ndk/21.4.7075529"
+        },
+        {
+          "name": "ANDROID_PLATFORM",
+          "value": "android-21"
+        },
+        {
+          "name": "CMAKE_ANDROID_ARCH_ABI",
+          "value": "arm64-v8a"
+        },
+        {
+          "name": "CMAKE_ANDROID_NDK",
+          "value": "/Users/rayrayrule/Library/Android/sdk/ndk/21.4.7075529"
+        },
+        {
+          "name": "CMAKE_EXPORT_COMPILE_COMMANDS",
+          "value": "ON"
+        },
+        {
+          "name": "CMAKE_LIBRARY_OUTPUT_DIRECTORY",
+          "value": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/build/intermediates/cmake/debug/obj/arm64-v8a"
+        },
+        {
+          "name": "CMAKE_RUNTIME_OUTPUT_DIRECTORY",
+          "value": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/build/intermediates/cmake/debug/obj/arm64-v8a"
+        },
+        {
+          "name": "CMAKE_MAKE_PROGRAM",
+          "value": "/Users/rayrayrule/Library/Android/sdk/cmake/3.10.2.4988404/bin/ninja"
+        },
+        {
+          "name": "CMAKE_SYSTEM_NAME",
+          "value": "Android"
+        },
+        {
+          "name": "CMAKE_SYSTEM_VERSION",
+          "value": "21"
+        },
+        {
+          "name": "ANDROID_STL",
+          "value": "c++_shared"
+        }
+      ]
+    },
+    "cmakeServerLogFile": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/.cxx/cmake/debug/arm64-v8a/cmake_server_log.txt"
+  },
+  "variant": {
+    "buildSystemArgumentList": [
+      "-DANDROID_STL\u003dc++_shared"
+    ],
+    "cFlagsList": [],
+    "cppFlagsList": [],
+    "variantName": "debug",
+    "objFolder": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/build/intermediates/cmake/debug/obj",
+    "soFolder": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/build/intermediates/cmake/debug/lib",
+    "isDebuggableEnabled": true,
+    "validAbiList": [
+      "ARM64_V8A"
+    ],
+    "buildTargetSet": [
+      "opencv_jni_shared"
+    ],
+    "implicitBuildTargetSet": [],
+    "cmakeSettingsConfiguration": "android-gradle-plugin-predetermined-name",
+    "module": {
+      "cxxFolder": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/.cxx",
+      "splitsAbiFilterSet": [],
+      "intermediatesFolder": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/build/intermediates",
+      "gradleModulePathName": ":openCV",
+      "moduleRootFolder": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV",
+      "moduleBuildFile": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/build.gradle",
+      "makeFile": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/libcxx_helper/CMakeLists.txt",
+      "buildSystem": "CMAKE",
+      "ndkFolder": "/Users/rayrayrule/Library/Android/sdk/ndk/21.4.7075529",
+      "ndkVersion": "21.4.7075529",
+      "ndkSupportedAbiList": [
+        "ARMEABI_V7A",
+        "ARM64_V8A",
+        "X86",
+        "X86_64"
+      ],
+      "ndkDefaultAbiList": [
+        "ARMEABI_V7A",
+        "ARM64_V8A",
+        "X86",
+        "X86_64"
+      ],
+      "ndkDefaultStl": "LIBCXX_STATIC",
+      "ndkMetaPlatforms": {
+        "min": 16,
+        "max": 30,
+        "aliases": {
+          "20": 19,
+          "25": 24,
+          "J": 16,
+          "J-MR1": 17,
+          "J-MR2": 18,
+          "K": 19,
+          "L": 21,
+          "L-MR1": 22,
+          "M": 23,
+          "N": 24,
+          "N-MR1": 24,
+          "O": 26,
+          "O-MR1": 27,
+          "P": 28,
+          "Q": 29,
+          "R": 30
+        }
+      },
+      "ndkMetaAbiList": [
+        {
+          "abi": "ARMEABI_V7A",
+          "bitness": 32,
+          "deprecated": false,
+          "default": true
+        },
+        {
+          "abi": "ARM64_V8A",
+          "bitness": 64,
+          "deprecated": false,
+          "default": true
+        },
+        {
+          "abi": "X86",
+          "bitness": 32,
+          "deprecated": false,
+          "default": true
+        },
+        {
+          "abi": "X86_64",
+          "bitness": 64,
+          "deprecated": false,
+          "default": true
+        }
+      ],
+      "originalCmakeToolchainFile": "/Users/rayrayrule/Library/Android/sdk/ndk/21.4.7075529/build/cmake/android.toolchain.cmake",
+      "cmakeToolchainFile": "/Users/rayrayrule/Library/Android/sdk/ndk/21.4.7075529/build/cmake/android.toolchain.cmake",
+      "cmake": {
+        "isValidCmakeAvailable": true,
+        "cmakeExe": "/Users/rayrayrule/Library/Android/sdk/cmake/3.10.2.4988404/bin/cmake",
+        "minimumCmakeVersion": "3.10.2",
+        "ninjaExe": "/Users/rayrayrule/Library/Android/sdk/cmake/3.10.2.4988404/bin/ninja",
+        "isPreferCmakeFileApiEnabled": true
+      },
+      "stlSharedObjectMap": {
+        "LIBCXX_SHARED": {
+          "ARMEABI_V7A": "/Users/rayrayrule/Library/Android/sdk/ndk/21.4.7075529/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so",
+          "ARM64_V8A": "/Users/rayrayrule/Library/Android/sdk/ndk/21.4.7075529/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so",
+          "X86": "/Users/rayrayrule/Library/Android/sdk/ndk/21.4.7075529/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/i686-linux-android/libc++_shared.so",
+          "X86_64": "/Users/rayrayrule/Library/Android/sdk/ndk/21.4.7075529/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so"
+        },
+        "LIBCXX_STATIC": {},
+        "NONE": {},
+        "SYSTEM": {}
+      },
+      "project": {
+        "rootBuildGradleFolder": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code",
+        "cxxFolder": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/.cxx",
+        "compilerSettingsCacheFolder": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/.cxx",
+        "sdkFolder": "/Users/rayrayrule/Library/Android/sdk",
+        "isNativeCompilerSettingsCacheEnabled": false,
+        "isBuildOnlyTargetAbiEnabled": true,
+        "ideBuildTargetAbi": "arm64-v8a,armeabi-v7a,armeabi",
+        "isCmakeBuildCohabitationEnabled": false,
+        "isPrefabEnabled": false,
+        "isV2NativeModelEnabled": true
+      },
+      "nativeBuildOutputLevel": "QUIET"
+    },
+    "prefabDirectory": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/.cxx/cmake/debug/prefab"
+  },
+  "buildSettings": {
+    "environmentVariables": []
+  },
+  "prefabFolder": "/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/.cxx/cmake/debug/prefab/arm64-v8a"
+}

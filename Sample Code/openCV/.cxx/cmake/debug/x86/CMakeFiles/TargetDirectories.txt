@@ -1,0 +1,3 @@
+/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/.cxx/cmake/debug/x86/CMakeFiles/rebuild_cache.dir
+/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/.cxx/cmake/debug/x86/CMakeFiles/edit_cache.dir
+/Users/rayrayrule/Documents/NYU/semester 3/Critical Object/Mobile-SDK-Android/Sample Code/openCV/.cxx/cmake/debug/x86/CMakeFiles/opencv_jni_shared.dir
