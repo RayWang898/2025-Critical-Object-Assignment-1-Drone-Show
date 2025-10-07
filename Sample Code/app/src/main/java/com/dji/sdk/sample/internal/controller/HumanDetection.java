@@ -147,8 +147,10 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
                 Log.d(TAG, "Armed: takeoff started");
                 ToastUtils.setResultToToast("Armed: takeoff started");
 
-                // 設定 VS 參數並啟用
-                setupVirtualStick(true);
+                // 等飛機穩定懸停後再開啟 Virtual Stick
+                new android.os.Handler().postDelayed(() -> {
+                    setupVirtualStick(true);
+                }, 5000); // 延遲 5 秒
 
             } else {
                 Log.e(TAG, "Armed: takeoff failed: " + takeoffError.getDescription());
