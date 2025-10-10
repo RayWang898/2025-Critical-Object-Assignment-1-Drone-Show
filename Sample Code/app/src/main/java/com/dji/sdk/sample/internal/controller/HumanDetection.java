@@ -1,4 +1,3 @@
-//!!rrr
 package com.dji.sdk.sample.internal.controller;
 
 import android.graphics.SurfaceTexture;
@@ -41,14 +40,11 @@ import dji.sdk.flightcontroller.FlightController;
 import dji.sdk.products.Aircraft;
 
 public class HumanDetection extends AppCompatActivity implements TextureView.SurfaceTextureListener {
-
     private static final String TAG = "HumanDetection";
-
     private TextureView textureView;
     private DJICodecManager codecManager;
     private VideoFeeder.VideoDataListener videoDataListener;
     private DJICodecManager.YuvDataCallback yuvCallback;
-
     private Net net; // MobileNet-SSD (Caffe)
 
     // Caffe MobileNet-SSD class list
@@ -62,25 +58,25 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
     private volatile boolean followHuman = false;
     private volatile boolean vsEnabled = false;
 
-    // 最新偵測的水平中心 x (0~1)，找不到人時置中（0.5）
+    // The latest detected horizontal center x (range 0–1); if no person is found, it defaults to the center (0.5).
     private volatile float latestXNorm = 0.5f;
-    // 送桿定時器（Virtual Stick 必須週期送出）
+    //Virtual stick command send out timer (Virtual Stick commands must be sent periodically)
     private final Handler vsHandler = new Handler(Looper.getMainLooper());
     private final int VS_PERIOD_MS = 100; // 10 Hz
     private final Runnable vsLoop = new Runnable() {
         @Override public void run() {
             if (flightController != null && vsEnabled && followHuman) {
-                // 將人臉（人）中心偏差換成 yaw 角速度
-                float error = latestXNorm - 0.5f; // 左負右正
-                float K = 60f;                    // 簡單比例增益
+                // Map the detected face center offset to a yaw angular velocity
+                float error = latestXNorm - 0.5f; // left: negative; right: positive
+                float K = 60f;
                 float yawRate = K * error;        // deg/s
-                yawRate = Math.max(-25f, Math.min(25f, yawRate)); // 安全限幅
+                yawRate = Math.max(-25f, Math.min(25f, yawRate)); // @@! safety yaw range: any number above 25 is 25
 
                 FlightControlData ctrl = new FlightControlData(
-                        0f,  // pitch velocity
-                        0f,  // roll velocity
+                        0f,  // pitch velocity (x)
+                        0f,  // roll velocity (y)
                         yawRate, // yaw angular velocity (deg/s)
-                        0f   // vertical velocity
+                        0f   // vertical velocity (z)
                 );
                 flightController.sendVirtualStickFlightControlData(ctrl, null);
             }
@@ -93,7 +89,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_human_detection);
 
-        // 取得 FlightController
+        // Get FlightController
         Aircraft ac = (Aircraft) DJISampleApplication.getProductInstance();
         if (ac != null) {
             flightController = ac.getFlightController();
@@ -108,7 +104,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
             Log.d(TAG, "OpenCV loaded successfully!");
         }
 
-        // 載入 DNN 模型（raw 資源）
+        // Loading DNN model (Deep Neural Network model) -->for OpenCV object recognition
         MatOfByte modelBuffer = loadFileFromResource(R.raw.mobilenet_iter_73000);
         MatOfByte configBuffer = loadFileFromResource(R.raw.deploy);
         if (modelBuffer == null || configBuffer == null) {
@@ -122,7 +118,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         textureView = findViewById(R.id.videoTex);
         textureView.setSurfaceTextureListener(this);
 
-        // 啟動 VS 送桿循環（先啟、但只有 followHuman && vsEnabled 才會送）
+        // initiate virtual stick handler process (buy only operate in followHuman && vsEnabled)
         vsHandler.post(vsLoop);
     }
 
@@ -138,7 +134,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         }
     }
 
-    // --- 任務：起飛 + 開啟 VS ---
+    // --- mission: armed--> takeoff + initiate VS ---
     private void armed() {
         if (flightController == null) return;
 
@@ -147,10 +143,10 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
                 Log.d(TAG, "Armed: takeoff started");
                 ToastUtils.setResultToToast("Armed: takeoff started");
 
-                // 等飛機穩定懸停後再開啟 Virtual Stick
+                // delay 5s, turn on VS only after drone is hovering steadily (if initiate too early--> VS data wont send in)
                 new android.os.Handler().postDelayed(() -> {
                     setupVirtualStick(true);
-                }, 5000); // 延遲 5 秒
+                }, 5000);
 
             } else {
                 Log.e(TAG, "Armed: takeoff failed: " + takeoffError.getDescription());
@@ -159,16 +155,17 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         });
     }
 
-    // --- 任務：降落（含 5s 後 confirm） ---
+    // --- mission: landing ---
     private void terminate() {
         if (flightController == null) return;
-
+        // start landing: decrease flying height and land if flat surface is detected
         flightController.startLanding(djiError -> {
             if (djiError == null) {
                 Log.d(TAG, "Terminate: landing started");
                 ToastUtils.setResultToToast("Terminate: landing started");
 
                 new Handler(Looper.getMainLooper()).postDelayed(() ->
+                        // confirm landing: force landing if yet landed 5s after start landing (landing even if no flat surface is detected)
                         flightController.confirmLanding(err -> {
                             if (err == null) {
                                 Log.d(TAG, "Terminate: Landing confirmed");
@@ -186,7 +183,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         });
     }
 
-    // --- 任務：短測試（起飛→關 VS→降落） ---
+    // --- mission: simple fly test (take off and landing when VS is turned off)
     private void test() {
         if (flightController == null) return;
 
@@ -196,14 +193,14 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
                 ToastUtils.setResultToToast("Test: Takeoff started");
 
                 new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                    // 確保關閉 VS 再降落
                     setupVirtualStick(false);
-
+                    // start landing: decrease flying height and land if flat surface is detected
                     flightController.startLanding(landingError -> {
                         if (landingError == null) {
                             Log.d(TAG, "Test: landing started");
                             ToastUtils.setResultToToast("Test: landing started");
                             new Handler(Looper.getMainLooper()).postDelayed(() ->
+                                    // confirm landing: force landing if yet landed 5s after start landing (landing even if no flat surface is detected)
                                     flightController.confirmLanding(err -> {
                                         if (err == null) {
                                             Log.d(TAG, "Test: Landing confirmed");
@@ -227,11 +224,11 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         });
     }
 
-    // --- Virtual Stick 設定/啟用 ---
+    // --- Virtual Stick setting/initiation ---
     private void setupVirtualStick(boolean enable) {
         if (flightController == null) return;
 
-        // 座標/控制模式
+        // Coordinate / Control Mode
         flightController.setRollPitchCoordinateSystem(FlightCoordinateSystem.BODY);
         flightController.setRollPitchControlMode(RollPitchControlMode.VELOCITY);
         flightController.setYawControlMode(YawControlMode.ANGULAR_VELOCITY);
@@ -248,7 +245,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         });
     }
 
-    // ---- TextureView callback ----
+    // ---- @@! TextureView callback (Main part dealing with sending data to openCV for recognition) ----
     @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
         Log.d(TAG, "Surface ready, init codecManager");
@@ -264,7 +261,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         codecManager.enabledYuvData(true);
 
         yuvCallback = (MediaFormat mediaFormat, ByteBuffer yuvFrame, int dataSize, int w, int h) -> {
-            // 轉成 Mat (I420 -> BGR)
+            // turn into Mat format (I420 -> BGR) --> Mat is OpenCV accepted data format
             Mat frame = yuvToMat(yuvFrame, w, h);
             Log.d(TAG, "Frame captured: " + frame.cols() + "x" + frame.rows());
 
@@ -295,8 +292,6 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
     private Mat yuvToMat(ByteBuffer yuvFrame, int w, int h) {
         byte[] yuvBytes = new byte[yuvFrame.remaining()];
         yuvFrame.get(yuvBytes);
-        // 若有需要重複讀取，可 yuvFrame.rewind();
-
         Mat yuvMat = new Mat(h + h / 2, w, CvType.CV_8UC1);
         yuvMat.put(0, 0, yuvBytes);
 
@@ -305,7 +300,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         return bgrMat;
     }
 
-    // ---- 偵測並更新 VS 目標 ----
+    // ---- detect and renew VS target ----
     private void detectAndUpdate(Mat frameBGR) {
         if (net == null) return;
 
@@ -347,11 +342,11 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
             int xCenter = (bestLeft + bestRight) / 2;
             latestXNorm = Math.max(0f, Math.min(1f, (float)xCenter / (float)cols));
 
-            // 顯示偵測結果
+            // showing detection result
             Log.d(TAG, String.format("Human Detected! conf=%.2f, xNorm=%.2f", bestConf, latestXNorm));
             ToastUtils.setResultToToast(String.format("Human Detected! conf=%.2f", bestConf));
         } else {
-            latestXNorm = 0.5f; // 沒人時歸中
+            latestXNorm = 0.5f; // when no one is detected, back at 0.5(center position)
         }
     }
 
