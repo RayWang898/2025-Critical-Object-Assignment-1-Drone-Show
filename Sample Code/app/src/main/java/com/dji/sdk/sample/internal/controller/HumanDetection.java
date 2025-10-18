@@ -34,10 +34,16 @@ import dji.common.flightcontroller.virtualstick.FlightCoordinateSystem;
 import dji.common.flightcontroller.virtualstick.RollPitchControlMode;
 import dji.common.flightcontroller.virtualstick.VerticalControlMode;
 import dji.common.flightcontroller.virtualstick.YawControlMode;
+import dji.common.gimbal.GimbalMode;
 import dji.sdk.camera.VideoFeeder;
 import dji.sdk.codec.DJICodecManager;
 import dji.sdk.flightcontroller.FlightController;
 import dji.sdk.products.Aircraft;
+
+import dji.sdk.gimbal.Gimbal;
+import dji.common.gimbal.GimbalMode;
+import dji.common.gimbal.Rotation;
+import dji.common.gimbal.RotationMode;
 
 public class HumanDetection extends AppCompatActivity implements TextureView.SurfaceTextureListener {
     private static final String TAG = "HumanDetection";
@@ -63,6 +69,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
     //Virtual stick command send out timer (Virtual Stick commands must be sent periodically)
     private final Handler vsHandler = new Handler(Looper.getMainLooper());
     private final int VS_PERIOD_MS = 100; // 10 Hz
+    private Gimbal gimbal;
     private final Runnable vsLoop = new Runnable() {
         @Override public void run() {
             if (flightController != null && vsEnabled && followHuman) {
@@ -120,6 +127,19 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
 
         // initiate virtual stick handler process (buy only operate in followHuman && vsEnabled)
         vsHandler.post(vsLoop);
+
+        ac = (Aircraft) DJISampleApplication.getProductInstance();
+        if (ac != null) {
+            flightController = ac.getFlightController();
+            gimbal = ac.getGimbal();
+        }
+
+        if (gimbal != null) {
+            gimbal.setMode(GimbalMode.FREE, djiError -> {
+                Log.d(TAG, djiError == null ? "Gimbal mode set to FREE" :
+                        "Set gimbal mode failed: " + djiError.getDescription());
+            });
+        }
     }
 
     private MatOfByte loadFileFromResource(int id) {
@@ -304,51 +324,84 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
     private void detectAndUpdate(Mat frameBGR) {
         if (net == null) return;
 
+        // Convert for DNN
         Imgproc.cvtColor(frameBGR, frameBGR, Imgproc.COLOR_BGR2RGB);
+        Mat blob = Dnn.blobFromImage(
+                frameBGR,
+                0.007843,                    // scale
+                new Size(300, 300),          // input size for MobileNet-SSD
+                new Scalar(127.5,127.5,127.5),
+                false,                       // swapRB
+                false                        // crop
+        );
 
-        Mat blob = Dnn.blobFromImage(frameBGR, 0.007843,
-                new Size(300, 300),
-                new Scalar(127.5, 127.5, 127.5),
-                false, false);
+        Mat detections = new Mat();
+        try {
+            net.setInput(blob);
+            detections = net.forward();
 
-        net.setInput(blob);
-        Mat detections = net.forward();
+            final int cols = frameBGR.cols();
+            final int rows = frameBGR.rows();
 
-        int cols = frameBGR.cols();
-        int rows = frameBGR.rows();
-        detections = detections.reshape(1, (int) detections.total() / 7);
+            detections = detections.reshape(1, (int) detections.total() / 7);
 
-        double bestConf = 0.0;
-        int bestLeft = 0, bestTop = 0, bestRight = 0, bestBottom = 0;
+            double bestConf = 0.0;
+            int bestLeft = 0, bestTop = 0, bestRight = 0, bestBottom = 0;
 
-        for (int i = 0; i < detections.rows(); ++i) {
-            double confidence = detections.get(i, 2)[0];
-            int classId = (int) detections.get(i, 1)[0];
+            for (int i = 0; i < detections.rows(); ++i) {
+                double confidence = detections.get(i, 2)[0];
+                int classId = (int) detections.get(i, 1)[0];
 
-            if (confidence > 0.3 && classId == 15) { // 15 = person
-                int left   = (int)(detections.get(i, 3)[0] * cols);
-                int top    = (int)(detections.get(i, 4)[0] * rows);
-                int right  = (int)(detections.get(i, 5)[0] * cols);
-                int bottom = (int)(detections.get(i, 6)[0] * rows);
+                if (confidence > 0.3 && classId == 15) { // 15 = "person"
+                    int left   = (int)(detections.get(i, 3)[0] * cols);
+                    int top    = (int)(detections.get(i, 4)[0] * rows);
+                    int right  = (int)(detections.get(i, 5)[0] * cols);
+                    int bottom = (int)(detections.get(i, 6)[0] * rows);
 
-                if (confidence > bestConf) {
-                    bestConf = confidence;
-                    bestLeft = left; bestTop = top; bestRight = right; bestBottom = bottom;
+                    if (confidence > bestConf) {
+                        bestConf = confidence;
+                        bestLeft = left; bestTop = top; bestRight = right; bestBottom = bottom;
+                    }
                 }
             }
-        }
 
-        if (bestConf > 0.3) {
-            int xCenter = (bestLeft + bestRight) / 2;
-            latestXNorm = Math.max(0f, Math.min(1f, (float)xCenter / (float)cols)); //@@! the calculation to the facing direction of the drone
+            if (bestConf > 0.3) {
+                int xCenter = (bestLeft + bestRight) / 2;
+                latestXNorm = Math.max(0f, Math.min(1f, (float) xCenter / (float) cols));
 
-            // showing detection result
-            Log.d(TAG, String.format("Human Detected! conf=%.2f, xNorm=%.2f", bestConf, latestXNorm));
-            ToastUtils.setResultToToast(String.format("Human Detected! conf=%.2f", bestConf));
-        } else {
-            latestXNorm = 0.5f; // when no one is detected, back at 0.5(center position)
+                // --- Gimbal yaw micro-adjust (relative angle) ---
+                if (gimbal != null) {
+                    float err = latestXNorm - 0.5f;          // [-0.5, +0.5]
+                    float maxGimbalYawDeg = 15f;             // small, smooth correction
+                    float deltaYawDeg = err * 2f * maxGimbalYawDeg;
+
+                    // clamp to a safe micro step each frame
+                    if (deltaYawDeg > 5f)  deltaYawDeg = 5f;
+                    if (deltaYawDeg < -5f) deltaYawDeg = -5f;
+
+                    Rotation r = new Rotation.Builder()
+                            .mode(RotationMode.RELATIVE_ANGLE)
+                            .yaw(deltaYawDeg)
+                            .build();
+
+                    gimbal.rotate(r, djiError -> {
+                        if (djiError != null) {
+                            Log.w(TAG, "Gimbal rotate failed: " + djiError.getDescription());
+                        }
+                    });
+                }
+
+                Log.d(TAG, String.format("Human Detected conf=%.2f, xNorm=%.2f", bestConf, latestXNorm));
+                ToastUtils.setResultToToast(String.format("Human Detected! conf=%.2f", bestConf));
+            } else {
+                latestXNorm = 0.5f; // center when not found
+            }
+        } finally {
+            blob.release();
+            detections.release();
         }
     }
+
 
 
     // --- UI onClick ---
