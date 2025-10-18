@@ -70,7 +70,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
                 float error = latestXNorm - 0.5f; // left: negative; right: positive
                 float K = 60f;
                 float yawRate = K * error;        // deg/s
-                yawRate = Math.max(-25f, Math.min(25f, yawRate)); // @@! safety yaw range: any number above 25 is 25
+                yawRate = Math.max(-100f, Math.min(100f, yawRate)); // @@! safety yaw range: any number above 25 is 25
 
                 FlightControlData ctrl = new FlightControlData(
                         0f,  // pitch velocity (x)
@@ -265,7 +265,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
             Mat frame = yuvToMat(yuvFrame, w, h);
             Log.d(TAG, "Frame captured: " + frame.cols() + "x" + frame.rows());
 
-            // 人形偵測；若跟隨啟用，更新 latestXNorm 給 VS 週期器
+            // Human detection; if tracking is enabled, update latestXNorm for the VS scheduler
             detectAndUpdate(frame);
         };
         codecManager.setYuvDataCallback(yuvCallback);
@@ -340,7 +340,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
 
         if (bestConf > 0.3) {
             int xCenter = (bestLeft + bestRight) / 2;
-            latestXNorm = Math.max(0f, Math.min(1f, (float)xCenter / (float)cols));
+            latestXNorm = Math.max(0f, Math.min(1f, (float)xCenter / (float)cols)); //@@! the calculation to the facing direction of the drone
 
             // showing detection result
             Log.d(TAG, String.format("Human Detected! conf=%.2f, xNorm=%.2f", bestConf, latestXNorm));
