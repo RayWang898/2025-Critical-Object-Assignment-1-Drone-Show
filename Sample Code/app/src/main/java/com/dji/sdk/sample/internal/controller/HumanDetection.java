@@ -58,27 +58,64 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
     private volatile boolean followHuman = false;
     private volatile boolean vsEnabled = false;
 
+    private volatile boolean targetVisible = false;
+    private volatile long lastSeenTs = 0L;
+
     // The latest detected horizontal center x (range 0–1); if no person is found, it defaults to the center (0.5).
     private volatile float latestXNorm = 0.5f;
     //Virtual stick command send out timer (Virtual Stick commands must be sent periodically)
     private final Handler vsHandler = new Handler(Looper.getMainLooper());
-    private final int VS_PERIOD_MS = 100; // 10 Hz
+    private final int VS_PERIOD_MS = 50; // 10 Hz
+    private final float K = 70f;             // 增益，可 120~200 視效調
+    private final float deadband = 0.02f;     // 2% 內不動
+    private final float minYaw = 10f;         // 最小角速 10°/s
+    private final float maxYaw = 100f;        // VS 上限
+    private final long  HOLD_MS = 900;        // 失去目標後保留 0.9s
+
+    private float lastYawCmd = 0f;
+
     private final Runnable vsLoop = new Runnable() {
         @Override public void run() {
-            if (flightController != null && vsEnabled && followHuman) {
-                // Map the detected face center offset to a yaw angular velocity
-                float error = latestXNorm - 0.5f; // left: negative; right: positive
-                float K = 100f;
-                float yawRate = K * error;        // deg/s
-                FlightControlData ctrl = new FlightControlData(
-                        0f,  // pitch velocity (x)
-                        0f,  // roll velocity (y)
-                        yawRate, // yaw angular velocity (deg/s)
-                        0f   // vertical velocity (z)
-                );
-                flightController.sendVirtualStickFlightControlData(ctrl, null);
+            try {
+                if (flightController != null && vsEnabled && followHuman) {
+                    // 是否在寬限期內
+                    boolean visibleOrHold = targetVisible ||
+                            (System.currentTimeMillis() - lastSeenTs) <= HOLD_MS;
+
+                    float yawRate = 0f;
+                    if (visibleOrHold) {
+                        float error = latestXNorm - 0.5f;
+                        if (Math.abs(error) > deadband) {
+                            yawRate = K * error;
+                            if (Math.abs(yawRate) < minYaw) {
+                                yawRate = Math.signum(yawRate) * minYaw;
+                            }
+                            if (yawRate >  maxYaw) yawRate =  maxYaw;
+                            if (yawRate < -maxYaw) yawRate = -maxYaw;
+                        }
+                    } else {
+                        // 真的長時間看不到 → 平滑回 0
+                        yawRate = 0f;
+                    }
+
+                    final float yawRateFinal = yawRate; // lambda 需要 effectively final
+                    flightController.sendVirtualStickFlightControlData(
+                            new FlightControlData(0f, 0f, yawRateFinal, 0f),
+                            err -> {
+                                if (err != null) {
+                                    Log.e(TAG, "VS send fail: " + err.getDescription());
+                                } else {
+                                    Log.d(TAG, String.format(
+                                            "VS yaw cmd=%.1f°/s (x=%.2f visible=%s)",
+                                            yawRateFinal, latestXNorm, visibleOrHold));
+                                }
+                            }
+                    );
+                    lastYawCmd = yawRate;
+                }
+            } finally {
+                vsHandler.postDelayed(this, VS_PERIOD_MS);
             }
-            vsHandler.postDelayed(this, VS_PERIOD_MS);
         }
     };
 
@@ -338,12 +375,15 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         if (bestConf > 0.3) {
             int xCenter = (bestLeft + bestRight) / 2;
             latestXNorm = Math.max(0f, Math.min(1f, (float)xCenter / (float)cols)); //@@! the calculation to the facing direction of the drone
+            targetVisible = true;
+            lastSeenTs = System.currentTimeMillis();
+            latestXNorm = Math.max(0f, Math.min(1f, (float)xCenter / cols));
 
             // showing detection result
             Log.d(TAG, String.format("Human Detected! conf=%.2f, xNorm=%.2f", bestConf, latestXNorm));
             ToastUtils.setResultToToast(String.format("Human Detected! conf=%.2f", bestConf));
         } else {
-            latestXNorm = 0.5f; // when no one is detected, back at 0.5(center position)
+            targetVisible = false;
         }
     }
 
