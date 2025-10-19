@@ -34,16 +34,10 @@ import dji.common.flightcontroller.virtualstick.FlightCoordinateSystem;
 import dji.common.flightcontroller.virtualstick.RollPitchControlMode;
 import dji.common.flightcontroller.virtualstick.VerticalControlMode;
 import dji.common.flightcontroller.virtualstick.YawControlMode;
-import dji.common.gimbal.GimbalMode;
 import dji.sdk.camera.VideoFeeder;
 import dji.sdk.codec.DJICodecManager;
 import dji.sdk.flightcontroller.FlightController;
 import dji.sdk.products.Aircraft;
-
-import dji.sdk.gimbal.Gimbal;
-import dji.common.gimbal.GimbalMode;
-import dji.common.gimbal.Rotation;
-import dji.common.gimbal.RotationMode;
 
 public class HumanDetection extends AppCompatActivity implements TextureView.SurfaceTextureListener {
     private static final String TAG = "HumanDetection";
@@ -69,15 +63,13 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
     //Virtual stick command send out timer (Virtual Stick commands must be sent periodically)
     private final Handler vsHandler = new Handler(Looper.getMainLooper());
     private final int VS_PERIOD_MS = 100; // 10 Hz
-    private Gimbal gimbal;
     private final Runnable vsLoop = new Runnable() {
         @Override public void run() {
             if (flightController != null && vsEnabled && followHuman) {
                 // Map the detected face center offset to a yaw angular velocity
                 float error = latestXNorm - 0.5f; // left: negative; right: positive
-                float K = 60f;
+                float K = 100f;
                 float yawRate = K * error;        // deg/s
-
                 FlightControlData ctrl = new FlightControlData(
                         0f,  // pitch velocity (x)
                         0f,  // roll velocity (y)
@@ -94,6 +86,12 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_human_detection);
+
+        // Get FlightController
+        Aircraft ac = (Aircraft) DJISampleApplication.getProductInstance();
+        if (ac != null) {
+            flightController = ac.getFlightController();
+        }
 
         // OpenCV
         if (!OpenCVLoader.initDebug()) {
@@ -263,7 +261,6 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
         yuvCallback = (MediaFormat mediaFormat, ByteBuffer yuvFrame, int dataSize, int w, int h) -> {
             // turn into Mat format (I420 -> BGR) --> Mat is OpenCV accepted data format
             Mat frame = yuvToMat(yuvFrame, w, h);
-            Log.d(TAG, "Frame captured: " + frame.cols() + "x" + frame.rows());
 
             // Human detection; if tracking is enabled, update latestXNorm for the VS scheduler
             detectAndUpdate(frame);
@@ -304,84 +301,51 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
     private void detectAndUpdate(Mat frameBGR) {
         if (net == null) return;
 
-        // Convert for DNN
         Imgproc.cvtColor(frameBGR, frameBGR, Imgproc.COLOR_BGR2RGB);
-        Mat blob = Dnn.blobFromImage(
-                frameBGR,
-                0.007843,                    // scale
-                new Size(300, 300),          // input size for MobileNet-SSD
-                new Scalar(127.5,127.5,127.5),
-                false,                       // swapRB
-                false                        // crop
-        );
 
-        Mat detections = new Mat();
-        try {
-            net.setInput(blob);
-            detections = net.forward();
+        Mat blob = Dnn.blobFromImage(frameBGR, 0.007843,
+                new Size(300, 300),
+                new Scalar(127.5, 127.5, 127.5),
+                false, false);
 
-            final int cols = frameBGR.cols();
-            final int rows = frameBGR.rows();
+        net.setInput(blob);
+        Mat detections = net.forward();
 
-            detections = detections.reshape(1, (int) detections.total() / 7);
+        int cols = frameBGR.cols();
+        int rows = frameBGR.rows();
+        detections = detections.reshape(1, (int) detections.total() / 7);
 
-            double bestConf = 0.0;
-            int bestLeft = 0, bestTop = 0, bestRight = 0, bestBottom = 0;
+        double bestConf = 0.0;
+        int bestLeft = 0, bestTop = 0, bestRight = 0, bestBottom = 0;
 
-            for (int i = 0; i < detections.rows(); ++i) {
-                double confidence = detections.get(i, 2)[0];
-                int classId = (int) detections.get(i, 1)[0];
+        for (int i = 0; i < detections.rows(); ++i) {
+            double confidence = detections.get(i, 2)[0];
+            int classId = (int) detections.get(i, 1)[0];
 
-                if (confidence > 0.3 && classId == 15) { // 15 = "person"
-                    int left   = (int)(detections.get(i, 3)[0] * cols);
-                    int top    = (int)(detections.get(i, 4)[0] * rows);
-                    int right  = (int)(detections.get(i, 5)[0] * cols);
-                    int bottom = (int)(detections.get(i, 6)[0] * rows);
+            if (confidence > 0.3 && classId == 15) { // 15 = person
+                int left   = (int)(detections.get(i, 3)[0] * cols);
+                int top    = (int)(detections.get(i, 4)[0] * rows);
+                int right  = (int)(detections.get(i, 5)[0] * cols);
+                int bottom = (int)(detections.get(i, 6)[0] * rows);
 
-                    if (confidence > bestConf) {
-                        bestConf = confidence;
-                        bestLeft = left; bestTop = top; bestRight = right; bestBottom = bottom;
-                    }
+                if (confidence > bestConf) {
+                    bestConf = confidence;
+                    bestLeft = left; bestTop = top; bestRight = right; bestBottom = bottom;
                 }
             }
+        }
 
-            if (bestConf > 0.3) {
-                int xCenter = (bestLeft + bestRight) / 2;
-                latestXNorm = Math.max(0f, Math.min(1f, (float) xCenter / (float) cols));
+        if (bestConf > 0.3) {
+            int xCenter = (bestLeft + bestRight) / 2;
+            latestXNorm = Math.max(0f, Math.min(1f, (float)xCenter / (float)cols)); //@@! the calculation to the facing direction of the drone
 
-                // --- Gimbal yaw micro-adjust (relative angle) ---
-                if (gimbal != null) {
-                    float err = latestXNorm - 0.5f;          // [-0.5, +0.5]
-                    float maxGimbalYawDeg = 15f;             // small, smooth correction
-                    float deltaYawDeg = err * 2f * maxGimbalYawDeg;
-
-                    // clamp to a safe micro step each frame
-                    if (deltaYawDeg > 5f)  deltaYawDeg = 5f;
-                    if (deltaYawDeg < -5f) deltaYawDeg = -5f;
-
-                    Rotation r = new Rotation.Builder()
-                            .mode(RotationMode.RELATIVE_ANGLE)
-                            .yaw(deltaYawDeg)
-                            .build();
-
-                    gimbal.rotate(r, djiError -> {
-                        if (djiError != null) {
-                            Log.w(TAG, "Gimbal rotate failed: " + djiError.getDescription());
-                        }
-                    });
-                }
-
-                Log.d(TAG, String.format("Human Detected conf=%.2f, xNorm=%.2f", bestConf, latestXNorm));
-                ToastUtils.setResultToToast(String.format("Human Detected! conf=%.2f", bestConf));
-            } else {
-                latestXNorm = 0.5f; // center when not found
-            }
-        } finally {
-            blob.release();
-            detections.release();
+            // showing detection result
+            Log.d(TAG, String.format("Human Detected! conf=%.2f, xNorm=%.2f", bestConf, latestXNorm));
+            ToastUtils.setResultToToast(String.format("Human Detected! conf=%.2f", bestConf));
+        } else {
+            latestXNorm = 0.5f; // when no one is detected, back at 0.5(center position)
         }
     }
-
 
 
     // --- UI onClick ---
