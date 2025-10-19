@@ -77,7 +77,6 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
                 float error = latestXNorm - 0.5f; // left: negative; right: positive
                 float K = 60f;
                 float yawRate = K * error;        // deg/s
-                //yawRate = Math.max(-100f, Math.min(100f, yawRate)); // @@! safety yaw range: any number above 25 is 25
 
                 FlightControlData ctrl = new FlightControlData(
                         0f,  // pitch velocity (x)
@@ -95,12 +94,6 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_human_detection);
-
-        // Get FlightController
-        Aircraft ac = (Aircraft) DJISampleApplication.getProductInstance();
-        if (ac != null) {
-            flightController = ac.getFlightController();
-        }
 
         // OpenCV
         if (!OpenCVLoader.initDebug()) {
@@ -127,19 +120,6 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
 
         // initiate virtual stick handler process (buy only operate in followHuman && vsEnabled)
         vsHandler.post(vsLoop);
-
-        ac = (Aircraft) DJISampleApplication.getProductInstance();
-        if (ac != null) {
-            flightController = ac.getFlightController();
-            gimbal = ac.getGimbal();
-        }
-
-        if (gimbal != null) {
-            gimbal.setMode(GimbalMode.FREE, djiError -> {
-                Log.d(TAG, djiError == null ? "Gimbal mode set to FREE" :
-                        "Set gimbal mode failed: " + djiError.getDescription());
-            });
-        }
     }
 
     private MatOfByte loadFileFromResource(int id) {
