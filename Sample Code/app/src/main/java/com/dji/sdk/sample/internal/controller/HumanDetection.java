@@ -70,7 +70,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
     private final float deadband = 0.02f;     // 2% 內不動
     private final float minYaw = 10f;         // 最小角速 10°/s
     private final float maxYaw = 100f;        // VS 上限
-    private final long  HOLD_MS = 900;        // 失去目標後保留 0.9s
+    private final long  HOLD_MS = 300;        // 失去目標後保留 0.9s
 
     private float lastYawCmd = 0f;
 
@@ -359,7 +359,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
             double confidence = detections.get(i, 2)[0];
             int classId = (int) detections.get(i, 1)[0];
 
-            if (confidence > 0.3 && classId == 15) { // 15 = person
+            if (confidence > 0.5 && classId == 15) { // 15 = person
                 int left   = (int)(detections.get(i, 3)[0] * cols);
                 int top    = (int)(detections.get(i, 4)[0] * rows);
                 int right  = (int)(detections.get(i, 5)[0] * cols);
@@ -372,7 +372,7 @@ public class HumanDetection extends AppCompatActivity implements TextureView.Sur
             }
         }
 
-        if (bestConf > 0.3) {
+        if (bestConf > 0.5) {
             int xCenter = (bestLeft + bestRight) / 2;
             latestXNorm = Math.max(0f, Math.min(1f, (float)xCenter / (float)cols)); //@@! the calculation to the facing direction of the drone
             targetVisible = true;
